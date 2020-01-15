@@ -25,11 +25,11 @@ class ArrayLengthSpecifiable(type):
     """Metaclass: repurposes square-bracket syntax to allow the definition of fixed-size N-D arrays of a type - just
     like in C! (Though strictly speaking the syntax is more like C#'s.)
     E.g. char[10].length == 10; int[5][5].length == 25."""
-    dimensions: List[int] = []  # elements hold length in ascending dimensions
+    dimensions: List[int] = []  # elements hold lengths in ascending dimensions
 
     def __getitem__(cls, length: int) -> Type:
-        if length < 1:
-            raise TypeError('Arrays of length < 1 are not permitted')
+        if length < 0:
+            raise TypeError('Size of array cannot be negative')
         # create a new copy of cls with altered dimensions schema
         return type(cls.__name__, cls.__bases__, dict(cls.__dict__, dimensions=[*cls.dimensions, length]))
 
@@ -39,11 +39,12 @@ class OnlyCTypeFieldsPermitted(type):
     def __new__(mcs, name, bases, dict_):
         from .types import CType
         if bases:  # if class being created subclasses something - i.e. ignore base class
-            if '__annotations__' in dict_:
-                for field_type in dict_['__annotations__'].values():
-                    if type(field_type) is str:  # evaluate string annotations
-                        module_context = sys.modules[dict_['__module__']]
-                        field_type = eval(field_type, dict(**vars(module_context), **dict_))
-                    if not issubclass(field_type, CType):
-                        raise TypeError('Only types defined in this package can be used in Structs')
+            annotations = dict_.setdefault('__annotations__', {})  # ensure class has annotations
+            for field_name, field_type in annotations.items():
+                if type(field_type) is str:  # evaluate string annotations
+                    module_vars = vars(sys.modules[dict_['__module__']])
+                    field_type = eval(field_type, dict(dict_, **module_vars))
+                    annotations[field_name] = field_type
+                if not issubclass(field_type, CType):
+                    raise TypeError('Only types defined in this package can be used in Structs')
         return super().__new__(mcs, name, bases, dict_)

@@ -7,7 +7,7 @@
 """
 import struct
 from enum import Enum
-from itertools import chain, islice
+from itertools import islice
 from .meta import OnlyCTypeFieldsPermitted, classproperty
 
 
@@ -57,11 +57,14 @@ class Struct(metaclass=OnlyCTypeFieldsPermitted):
             '\n'.join(f'    {n}: {t.__name__} = {getattr(self, n)}' for n, t in self.__annotations__.items()) + \
             '\n}'
 
+    def __eq__(self, other):
+        """Compare this struct instance to another."""
+        return isinstance(other, self.__class__) and all(a == b for a, b in zip(vars(self), vars(other)))
+
     def to_bytes(self) -> bytes:
         """Return the in-memory (packed) representation of this struct instance."""
-        attr_values = [getattr(self, name) for name in self.__annotations__]
-        flat_values = chain(*(v if isinstance(v, tuple) else [v] for v in attr_values))  # flatten arrays for packing
-        return struct.pack(self.format_string, *flat_values)
+        flatten = lambda nested: (element for n in nested for element in (flatten(n) if type(n) is tuple else [n]))
+        return struct.pack(self.format_string, *flatten(getattr(self, s) for s in self.__annotations__))
 
     @classproperty
     def format_string(cls) -> str:
