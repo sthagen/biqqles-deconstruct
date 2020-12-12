@@ -83,16 +83,22 @@ When you instantiate your Struct with a [bytes-like object](https://docs.python.
 
 Note that `TypeWidth.NATIVE` can only be used with `ByteOrder.NATIVE`. This is a limitation of Python's struct.
 
-#### Properties
+#### Class methods
+|Signature       |Return type|Description   |
+|----------------|-----------|--------------|
+|`new(*args)`    |`Struct`   |Construct a new struct instance with field values specified as positional arguments, passed in order of definition. Note that arguments are not type checked.|
+
+#### Class properties
 |Name            |Type       |Description   |
 |----------------|-----------|--------------|
 |`format_string` |`str`      |The struct.py-compatible format string for this struct|
 |`sizeof`        |`int`      |The total size in bytes of the struct. Equivalent to C's `sizeof`|
 
-#### Methods
+#### Instance methods
 |Signature       |Return type|Description   |
 |----------------|-----------|--------------|
 |`to_bytes()`    |`bytes`    |Returns the in-memory ("packed") representation of this struct instance|
+|`_require()`    |`bool`     |Override this method to specify your own instance validation logic. This method is called each time the struct is initialised; a `ValueError` will be raised if it returns false.|
 
 You can also `print` Struct instances for easier debugging and compare them using the `==` operator.
 
@@ -134,6 +140,13 @@ deconstruct defines the following special types for use in Struct definitions:<s
 
 ### Arrays
 As mentioned earlier, all the types above support a `type[length]` syntax to define arrays. Multidimensional arrays work as you would expect, with `int[2][2]` declaring a 2-D array of type `int` and total length 4. When a Struct is used to unpack a buffer, each array will resolve to a tuple (or in the case of a multidimensional array, a nested tuple) of their equivalent Python types, as documented in the table above. The only exception to this is `char`, an array of which will be automatically concatenated to a single `bytes` object (if this behaviour is undesirable, use `schar` or `uchar` instead).
+
+### Pointers
+`ptr` uniquely supports an optional notation format using the `>` operator, allowing you to denote the type it points to. This notation is purely for programmer convenience - it, for example, has no effect on the size of the struct as all pointers are assumed to be of the size of `void*` (which is guaranteed to be able to hold any pointer).
+
+To illustrate this syntax, `f: c.ptr > c.double` denotes a pointer to double (`double* f;`). Arrays of pointers *and* pointers to arrays are supported. For example, `c.ptr[2] > c.int` indicates an array of `int*`, while `c.ptr > c.int[2]` indicates a pointer to an `int` array.
+
+You can also use `Struct` subtypes as the pointed-to type.
 
 ---
 

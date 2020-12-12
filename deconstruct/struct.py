@@ -51,6 +51,10 @@ class Struct(metaclass=OnlyCTypeFieldsPermitted):
                 field_value = next(unpacked)
             setattr(self, field_name, field_type.value_of(field_value))
 
+        # finally, validate
+        if not self._require():
+            raise ValueError(f'require() condition unmet:\n{self!r}')
+
     def __repr__(self) -> str:
         """Return a textual representation of this struct instance."""
         return f'struct {type(self).__name__} [{self.__byte_order__}, {self.__type_width__}] {{\n' + \
@@ -62,10 +66,25 @@ class Struct(metaclass=OnlyCTypeFieldsPermitted):
         and the same values for those fields."""
         return isinstance(other, self.__class__) and vars(self) == vars(other)
 
+    def _require(self) -> bool:
+        """Override this method to specify your own instance validation logic. This method is called each time the
+        struct is initialised; a `ValueError` will be raised if it returns false. Inspired by Kotlin's `require`."""
+        return True
+
     def to_bytes(self) -> bytes:
-        """Return the in-memory (packed) representation of this struct instance."""
+        """Return the in-memory ("packed") representation of this struct instance."""
         flatten = lambda nested: (element for n in nested for element in (flatten(n) if type(n) is tuple else [n]))
         return struct.pack(self.format_string, *flatten(getattr(self, s) for s in self.__annotations__))
+
+    @classmethod
+    def new(cls, *args) -> 'Struct':
+        """Construct a new struct instance with field values specified as positional arguments, passed in order of
+        definition. Note that arguments are not type checked."""
+        assert len(args) == len(cls.__annotations__), 'The number of arguments must exactly match the number of fields'
+        instance = cls.__new__(cls)
+        for f, v in zip(cls.__annotations__, args):
+            setattr(instance, f, v)
+        return instance
 
     @classproperty
     def format_string(cls) -> str:
